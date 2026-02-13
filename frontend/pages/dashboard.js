@@ -1,42 +1,57 @@
 import { useEffect, useMemo, useState } from "react";
 import Layout from "../components/Layout";
 import ErrorBanner from "../components/ErrorBanner";
-import { listIncidents } from "../services/api";
+import { api } from "../services/api"; // Change to api
 
 export default function Dashboard() {
   const [items, setItems] = useState([]);
   const [err, setErr] = useState("");
+  const [showArchived, setShowArchived] = useState(false); // Add this
 
   useEffect(() => {
     (async () => {
       try {
         setErr("");
-        const data = await listIncidents();
+        const data = await api.getIncidents(showArchived); // Pass the filter
         setItems(Array.isArray(data) ? data : []);
       } catch (e) {
         setErr(e.message);
       }
     })();
-  }, []);
+  }, [showArchived]); // Add dependency
 
   const stats = useMemo(() => {
     const total = items.length;
     const open = items.filter(x => x.status === "OPEN").length;
     const investigating = items.filter(x => x.status === "INVESTIGATING").length;
     const resolved = items.filter(x => x.status === "RESOLVED").length;
+    const archived = items.filter(x => x.status === "ARCHIVED").length;
     const high = items.filter(x => x.severity === "HIGH").length;
-    return { total, open, investigating, resolved, high };
+    return { total, open, investigating, resolved, archived, high };
   }, [items]);
 
   return (
     <Layout title="Dashboard">
       <ErrorBanner message={err} />
 
+      {/* Add Show Archived Checkbox */}
+      <div style={{ marginBottom: "1rem", display: "flex", alignItems: "center" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+          />
+          <span>Show Archived Incidents</span>
+        </label>
+      </div>
+
       <div className="kpis">
         <div className="kpi"><div className="kpi-label">Total</div><div className="kpi-value">{stats.total}</div></div>
         <div className="kpi"><div className="kpi-label">Open</div><div className="kpi-value">{stats.open}</div></div>
         <div className="kpi"><div className="kpi-label">Investigating</div><div className="kpi-value">{stats.investigating}</div></div>
         <div className="kpi"><div className="kpi-label">Resolved</div><div className="kpi-value">{stats.resolved}</div></div>
+        <div className="kpi"><div className="kpi-label">Archived</div><div className="kpi-value">{stats.archived}</div></div>
         <div className="kpi"><div className="kpi-label">High Severity</div><div className="kpi-value">{stats.high}</div></div>
       </div>
 
@@ -44,6 +59,9 @@ export default function Dashboard() {
         <StatusColumn title="OPEN" items={items.filter(x => x.status === "OPEN")} />
         <StatusColumn title="INVESTIGATING" items={items.filter(x => x.status === "INVESTIGATING")} />
         <StatusColumn title="RESOLVED" items={items.filter(x => x.status === "RESOLVED")} />
+        {showArchived && (
+          <StatusColumn title="ARCHIVED" items={items.filter(x => x.status === "ARCHIVED")} />
+        )}
       </div>
     </Layout>
   );

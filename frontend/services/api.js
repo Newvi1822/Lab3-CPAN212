@@ -1,4 +1,4 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:500";
+const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const TIMEOUT = 10000; // 10 second timeout
 
 async function fetchWithTimeout(url, options = {}) {
@@ -49,21 +49,24 @@ export async function health() {
   return handleJson(res);
 }
 
-// Get all incidents
-export async function listIncidents() {
-  const res = await fetchWithTimeout(`${BASE}/incidents`);
+// Get all incidents (with optional archived filter)
+export async function listIncidents(includeArchived = false) {
+  const url = includeArchived 
+    ? `${BASE}/api/incidents?includeArchived=true`
+    : `${BASE}/api/incidents`;
+  const res = await fetchWithTimeout(url);
   return handleJson(res);
 }
 
 // Get incident by ID
 export async function getIncident(id) {
-  const res = await fetchWithTimeout(`${BASE}/incidents/${encodeURIComponent(id)}`);
+  const res = await fetchWithTimeout(`${BASE}/api/incidents/${encodeURIComponent(id)}`);
   return handleJson(res);
 }
 
 // Create a new incident
 export async function createIncident(payload) {
-  const res = await fetchWithTimeout(`${BASE}/incidents`, {
+  const res = await fetchWithTimeout(`${BASE}/api/incidents`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -73,7 +76,7 @@ export async function createIncident(payload) {
 
 // Update incident status
 export async function changeIncidentStatus(id, status) {
-  const res = await fetchWithTimeout(`${BASE}/incidents/${encodeURIComponent(id)}/status`, {
+  const res = await fetchWithTimeout(`${BASE}/api/incidents/${encodeURIComponent(id)}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status })
@@ -86,7 +89,7 @@ export async function bulkUploadCsv(file) {
   const fd = new FormData();
   fd.append("file", file);
 
-  const res = await fetchWithTimeout(`${BASE}/incidents/bulk-upload`, {
+  const res = await fetchWithTimeout(`${BASE}/api/incidents/bulk-upload`, {
     method: "POST",
     body: fd
   });
@@ -94,7 +97,7 @@ export async function bulkUploadCsv(file) {
   return handleJson(res);
 }
 
-// Optional API object for convenience
+// API object for convenience
 export const api = {
   health,
   getIncidents: listIncidents,

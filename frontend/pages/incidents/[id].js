@@ -1,21 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
-import Link from "next/link"; // Add this for better navigation
+import Link from "next/link";
 import Layout from "../../components/Layout";
 import ErrorBanner from "../../components/ErrorBanner";
-import { api } from "../../services/api"; // Change to use api object
+import { api } from "../../services/api";
 
+// Updated STATUS_FLOW with ARCHIVED
 const STATUS_FLOW = {
-  OPEN: ["INVESTIGATING"],
+  OPEN: ["INVESTIGATING", "ARCHIVED"],
   INVESTIGATING: ["RESOLVED"],
-  RESOLVED: []
+  RESOLVED: ["ARCHIVED"],
+  ARCHIVED: ["OPEN"]
 };
 
-// Status color mapping
+// Status color mapping (added ARCHIVED)
 const STATUS_COLORS = {
   OPEN: "#f39c12",
   INVESTIGATING: "#3498db",
-  RESOLVED: "#27ae60"
+  RESOLVED: "#27ae60",
+  ARCHIVED: "#6c757d"
 };
 
 // Severity color mapping
@@ -32,8 +35,7 @@ export default function IncidentDetails() {
   const [item, setItem] = useState(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(""); // Add success state
-
+  const [success, setSuccess] = useState("");
   const [nextStatus, setNextStatus] = useState("");
   const [updating, setUpdating] = useState(false);
 
@@ -52,8 +54,8 @@ export default function IncidentDetails() {
     try {
       setLoading(true);
       setErr("");
-      setSuccess(""); // Clear success message
-      const data = await api.getIncident(id); // Change to api.getIncident()
+      setSuccess("");
+      const data = await api.getIncident(id);
       setItem(data);
 
       const allowed = STATUS_FLOW[data.status] || [];
@@ -67,7 +69,6 @@ export default function IncidentDetails() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const allowedNext = useMemo(() => {
@@ -80,15 +81,51 @@ export default function IncidentDetails() {
     try {
       setUpdating(true);
       setErr("");
-      setSuccess(""); // Clear previous success
+      setSuccess("");
       
-      const updated = await api.updateStatus(item.id, nextStatus); // Change to api.updateStatus()
+      const updated = await api.updateStatus(item.id, nextStatus);
       
       setItem(updated);
       const newAllowed = STATUS_FLOW[updated.status] || [];
       setNextStatus(newAllowed[0] || "");
       
-      setSuccess(`Status updated to ${nextStatus} successfully!`); // Show success message
+      setSuccess(`Status updated to ${nextStatus} successfully!`);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  // NEW: Handle Archive
+  async function handleArchive() {
+    if (!item) return;
+    try {
+      setUpdating(true);
+      setErr("");
+      setSuccess("");
+      
+      const updated = await api.updateStatus(item.id, 'ARCHIVED');
+      setItem(updated);
+      setSuccess('Incident archived successfully');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  // NEW: Handle Restore
+  async function handleRestore() {
+    if (!item) return;
+    try {
+      setUpdating(true);
+      setErr("");
+      setSuccess("");
+      
+      const updated = await api.updateStatus(item.id, 'OPEN');
+      setItem(updated);
+      setSuccess('Incident restored to OPEN');
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -122,7 +159,7 @@ export default function IncidentDetails() {
     <Layout title="Incident Details">
       <ErrorBanner message={err} />
       
-      {/* Add success message banner */}
+      {/* Success message banner */}
       {success && (
         <div style={{ 
           backgroundColor: "#d4edda", 
@@ -155,18 +192,17 @@ export default function IncidentDetails() {
               <div className="box">{item.description}</div>
             </div>
 
-            <div className="section">
-              <div className="section-title">Update Status</div>
-
-              {allowedNext.length === 0 ? (
-                <div className="muted">No further transitions available. This incident is resolved.</div>
-              ) : (
+            {/* Status Update Section - Only show if not ARCHIVED or if there are transitions */}
+            {item.status !== 'ARCHIVED' && allowedNext.length > 0 && (
+              <div className="section">
+                <div className="section-title">Update Status</div>
                 <div className="row" style={{ gap: "1rem", alignItems: "center" }}>
                   <select 
                     className="select" 
                     value={nextStatus} 
                     onChange={(e) => setNextStatus(e.target.value)}
                     style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid #ddd" }}
+                    disabled={updating}
                   >
                     {allowedNext.map(s => (
                       <option key={s} value={s}>{s}</option>
@@ -189,9 +225,65 @@ export default function IncidentDetails() {
                     {updating ? "Updating..." : "Update Status"}
                   </button>
                 </div>
-              )}
+              </div>
+            )}
+
+            {/* NEW: Archive Management Section */}
+            <div className="section">
+              <div className="section-title">Archive Management</div>
+              <div className="row" style={{ gap: "1rem", alignItems: "center" }}>
+                {/* Show Archive button for OPEN or RESOLVED incidents */}
+                {(item.status === 'OPEN' || item.status === 'RESOLVED') && (
+                  <button 
+                    onClick={handleArchive}
+                    disabled={updating}
+                    style={{
+                      backgroundColor: "#dc3545",
+                      color: "white",
+                      border: "none",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "4px",
+                      cursor: updating ? "not-allowed" : "pointer",
+                      opacity: updating ? 0.7 : 1,
+                      fontSize: "0.95rem",
+                      fontWeight: "600"
+                    }}
+                  >
+                    Archive Incident
+                  </button>
+                )}
+                
+                {/* Show Restore button for ARCHIVED incidents */}
+                {item.status === 'ARCHIVED' && (
+                  <button 
+                    onClick={handleRestore}
+                    disabled={updating}
+                    style={{
+                      backgroundColor: "#28a745",
+                      color: "white",
+                      border: "none",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "4px",
+                      cursor: updating ? "not-allowed" : "pointer",
+                      opacity: updating ? 0.7 : 1,
+                      fontSize: "0.95rem",
+                      fontWeight: "600"
+                    }}
+                  >
+                    Restore to OPEN
+                  </button>
+                )}
+
+                {/* Show message if no archive actions available */}
+                {item.status === 'INVESTIGATING' && (
+                  <div className="muted" style={{ fontStyle: "italic" }}>
+                    ⚠️ Cannot archive incidents in INVESTIGATING status. Resolve first.
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* Navigation buttons */}
             <div className="row" style={{ marginTop: "2rem", gap: "1rem" }}>
               <button 
                 className="btn btn-secondary" 

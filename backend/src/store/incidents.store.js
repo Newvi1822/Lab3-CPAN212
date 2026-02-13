@@ -1,21 +1,25 @@
 const { v4: uuidv4 } = require('uuid');
-
-// In-memory store
-let incidents = [];
+const { readData, writeData } = require('../utils/fileStorage');
 
 const store = {
-  // Get all incidents
-  getAll: () => {
-    return [...incidents];
+  // Get all incidents (with optional archived filter)
+  getAll: async (includeArchived = false) => {
+    const incidents = await readData();
+    if (!includeArchived) {
+      return incidents.filter(i => i.status !== 'ARCHIVED');
+    }
+    return incidents;
   },
 
   // Get incident by id
-  getById: (id) => {
+  getById: async (id) => {
+    const incidents = await readData();
     return incidents.find(incident => incident.id === id);
   },
 
   // Create new incident
-  create: (incidentData) => {
+  create: async (incidentData) => {
+    const incidents = await readData();
     const newIncident = {
       id: uuidv4(),
       ...incidentData,
@@ -23,21 +27,25 @@ const store = {
       reportedAt: new Date().toISOString()
     };
     incidents.push(newIncident);
+    await writeData(incidents);
     return newIncident;
   },
 
   // Update incident status
-  updateStatus: (id, newStatus) => {
+  updateStatus: async (id, newStatus) => {
+    const incidents = await readData();
     const incident = incidents.find(inc => inc.id === id);
     if (incident) {
       incident.status = newStatus;
+      await writeData(incidents);
       return incident;
     }
     return null;
   },
 
   // Create multiple incidents (for bulk upload)
-  createMany: (incidentsData) => {
+  createMany: async (incidentsData) => {
+    const incidents = await readData();
     const created = [];
     const skipped = [];
     
@@ -56,12 +64,23 @@ const store = {
       }
     });
     
+    await writeData(incidents);
     return { created, skipped };
   },
 
+  // Archive incident (helper method)
+  archive: async (id) => {
+    return store.updateStatus(id, 'ARCHIVED');
+  },
+
+  // Restore from archive (helper method)
+  restore: async (id) => {
+    return store.updateStatus(id, 'OPEN');
+  },
+
   // Clear store (for testing)
-  clear: () => {
-    incidents = [];
+  clear: async () => {
+    await writeData([]);
   }
 };
 
