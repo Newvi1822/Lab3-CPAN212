@@ -1,3 +1,15 @@
+# dependencies
 node_modules/
+package-lock.json
+
+# next.js build
+.next/
+out/
+
+# environment files
 .env
 .env.local
+.env.*.local
+
+# uploads
+uploads/
